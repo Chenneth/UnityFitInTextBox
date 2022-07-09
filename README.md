@@ -6,7 +6,7 @@ Splits a given string into an array in which each element fits into a given Unit
 
 ### Disclaimer
 
-Oringinal code was from my DialogueSystem repository. The code in that one hasn't been updated to this one yet.
+Original code was from my DialogueSystem repository. The code in that one hasn't been updated to this one yet.
 
 This code does **NOT** work well with languages that don't use spaces to delimit words (e.g. Japanese or Chinese). It will separate the strings based on however many characters it can fit into the textbox.
 
