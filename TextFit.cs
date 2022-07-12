@@ -29,15 +29,6 @@ public class TextFit : MonoBehaviour
 
         var textGenerator = testText.cachedTextGeneratorForLayout;
 
-
-        /*
-        if (message.All(IsCnJp)) //if all the chars are cn/jp
-        {
-            //then we do diff algorithm (yay)
-            
-        }
-        */
-        
         //if there's whitespace, then it will fill the textbox normally based on words/newlines, otherwise it will try to fill the text box with as many chars as possible
         return message.All(char.IsWhiteSpace) ? MaxVerticalWordDisplay(message, textGenerator, generationSettings, rectHeight) : MaxCharDisplay(message, textGenerator, generationSettings, rectHeight);
     }
@@ -53,7 +44,6 @@ public class TextFit : MonoBehaviour
     /// <returns></returns>
     public static List<string> MaxVerticalTextDisplay(Text testText, string message)
     {
-        
         if (string.IsNullOrEmpty(message))
             throw new ArgumentException("The string was either null or empty.", nameof(message));
         
@@ -63,20 +53,10 @@ public class TextFit : MonoBehaviour
 
         var textGenerator = testText.cachedTextGeneratorForLayout;
 
-
-
-        /*
-        if (message.All(IsCnJp)) //if all the chars are cn/jp
-        {
-            //then we do diff algorithm (yay)
-            //MaxCnJpDisplay(message, textGenerator, generationSettings, rectHeight);
-        }
-        */
-        
         return message.All(char.IsWhiteSpace) ? MaxVerticalWordDisplay(message, textGenerator, generationSettings, rectHeight) : MaxCharDisplay(message, textGenerator, generationSettings, rectHeight);
     }
 
-    private static readonly Regex _regex = new(@"\b(\S+\s*)");
+    private static readonly Regex WORD_MATCH = new(@"\b(\S+\s*)");
     
     //punctuation is included in the strings (since ' ' is used as a delimiter).
     private static List<string> MaxVerticalWordDisplay(string message, TextGenerator textGenerator,
@@ -87,39 +67,64 @@ public class TextFit : MonoBehaviour
             throw new UnityException("The width or height of the Text GameObject is too small to fit any text.");
         }
         string currentString = "";
-        string previousString = "";
+        string previousString = ""; //prev string exists to prevent the need to backtrack/try to subtract a string (although I suppose I could use words[i].Length and some substring nonsense)
         var strings = new List<string>(3);
         //var words = _regex.Split(message).Where(s => !string.IsNullOrEmpty(s)).ToList();
-        string[] words = _regex.Matches(message).Select(m => m.Value).ToArray();
+        string[] words = WORD_MATCH.Matches(message).Select(m => m.Value).ToArray();
         //next we add the words to the strings
 
         for (var i = 0; i < words.Length; i++)
         {
             currentString += words[i];
-            /*currentString += $" {words[i]}";*/
-
-            //supposedly this if statement always fails... however this function... well, functioned, fine so maybe i forgot (as usual) to do some code cleanup
-            //in any case, i'm not saying this code is efficient, but it does the stuff properly so who cares? not like unity provides a better option (yet?)
-            var prefHeight = textGenerator.GetPreferredHeight(currentString, generationSettings);
-            if (prefHeight > rectHeight)
+            float prefHeight = textGenerator.GetPreferredHeight(currentString, generationSettings);
+            if (prefHeight > rectHeight) //if the text cannot fit into the box
             {
-                //unknown if this is needed due to now using Regex.Matches instead of string.split
-                /*//removes a random space that would sometimes appear at the start of a message
-                if (Char.IsWhiteSpace(previousString[0]))
-                    previousString = previousString[1..];*/
                 strings.Add(previousString);
-                previousString = "";
                 currentString = previousString = words[i];
             }
-            //this is kinda useless since currentString would be set blank in the if statement...
-            else
+            else //if it can fit then update previousString
             {
                 previousString = currentString;
             }
         }
+        strings.Add(previousString);
+        return strings;
+    }
+    
+    //this one sets interprets newlines and carriage returns as separating the message to a new element in the array
+    private static List<string> MaxVerticalWordDisplayAlt(string message, TextGenerator textGenerator,
+        TextGenerationSettings generationSettings, float rectHeight)
+    {
+        if (textGenerator.GetPreferredHeight("W", generationSettings) > rectHeight)
+        {
+            throw new UnityException("The width or height of the Text GameObject is too small to fit any text.");
+        }
+        string currentString = "";
+        string previousString = ""; //prev string exists to prevent the need to backtrack/try to subtract a string (although I suppose I could use words[i].Length and some substring nonsense)
+        var strings = new List<string>(3);
+        //var words = _regex.Split(message).Where(s => !string.IsNullOrEmpty(s)).ToList();
+        string[] words = WORD_MATCH.Matches(message).Select(m => m.Value).ToArray();
+        //next we add the words to the strings
 
-        if (Char.IsWhiteSpace(previousString[0]))
-            previousString = previousString[1..];
+        for (var i = 0; i < words.Length; i++)
+        {
+            currentString += words[i];
+            float prefHeight = textGenerator.GetPreferredHeight(currentString, generationSettings);
+            if (prefHeight > rectHeight) //if the text cannot fit into the box
+            {
+                strings.Add(previousString);
+                currentString = previousString = words[i];
+            }
+            else if (currentString[^1] is '\n' or '\r') //if the text can fit in the box but ends with a newline or return
+            {
+                strings.Add(currentString[..^1]);
+                currentString = previousString = "";
+            }
+            else //otherwise we add stuff to prev string
+            {
+                previousString = currentString;
+            }
+        }
         strings.Add(previousString);
         return strings;
     }
