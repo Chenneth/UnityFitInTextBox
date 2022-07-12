@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -12,12 +13,16 @@ public class TextFit : MonoBehaviour
     ///     This only works for languages that use spaces to delimit words (this may result in unnatural splicing of East Asian
     ///     words)
     /// </summary>
-    /// <param name="testText">The text box to be tested.</param>
+    /// <param name="testText">The Unity Text to be tested.</param>
     /// <param name="canvas">The Canvas that contains <see cref="testText" />/></param>
     /// <param name="message">The message to be inputted into <see cref="testText" /></param>
+    /// <param name="newlineSeparator">If true, then newline and carriage returns pushes the following characters into a new index.</param>
     /// <returns></returns>
-    public static List<string> MaxVerticalTextDisplay(Text testText, Canvas canvas, string message)
+    public static List<string> MaxVerticalTextDisplay(Text testText, Canvas canvas, string message, bool newlineSeparator = false)
     {
+        
+        if (string.IsNullOrEmpty(message))
+            throw new ArgumentException("The string was either null or empty.", nameof(message));
         var rect = testText.rectTransform.rect;
         var generationSettings = testText.GetGenerationSettings(rect.size);
         var rectHeight = rect.height * canvas.scaleFactor;
@@ -25,22 +30,16 @@ public class TextFit : MonoBehaviour
         var textGenerator = testText.cachedTextGeneratorForLayout;
 
 
-
+        /*
         if (message.All(IsCnJp)) //if all the chars are cn/jp
         {
             //then we do diff algorithm (yay)
             
         }
+        */
         
-        //if the given message does not contain any spaces todo: check for JP/CN chars (since I don't know anything about KR/AR etc.) to delimit it in its own algorithm, 
-        if (!message.Contains(" "))
-        {
-            //then we will run through each character instead and return the string which has as many characters within it as possible
-            //Without overflowing the textbox height
-            return MaxCharDisplay(message, textGenerator, generationSettings, rectHeight);
-        }
-
-        return MaxVerticalWordDisplay(message, textGenerator, generationSettings, rectHeight);
+        //if there's whitespace, then it will fill the textbox normally based on words/newlines, otherwise it will try to fill the text box with as many chars as possible
+        return message.All(char.IsWhiteSpace) ? MaxVerticalWordDisplay(message, textGenerator, generationSettings, rectHeight) : MaxCharDisplay(message, textGenerator, generationSettings, rectHeight);
     }
 
     /// <summary>
@@ -49,11 +48,15 @@ public class TextFit : MonoBehaviour
     ///     This only works for languages that use spaces to delimit words (this may result in unnatural splicing of East Asian
     ///     words)
     /// </summary>
-    /// <param name="testText">The text box to be tested.</param>
+    /// <param name="testText">The Unity Text to be tested.</param>
     /// <param name="message">The message to be inputted into <see cref="testText" /></param>
     /// <returns></returns>
     public static List<string> MaxVerticalTextDisplay(Text testText, string message)
     {
+        
+        if (string.IsNullOrEmpty(message))
+            throw new ArgumentException("The string was either null or empty.", nameof(message));
+        
         var rect = testText.rectTransform.rect;
         var generationSettings = testText.GetGenerationSettings(rect.size);
         var rectHeight = rect.height;
@@ -62,23 +65,19 @@ public class TextFit : MonoBehaviour
 
 
 
+        /*
         if (message.All(IsCnJp)) //if all the chars are cn/jp
         {
             //then we do diff algorithm (yay)
             //MaxCnJpDisplay(message, textGenerator, generationSettings, rectHeight);
         }
+        */
         
-        //if the given message does not contain any spaces todo: check for JP/CN chars (since I don't know anything about KR/AR etc.) to delimit it in its own algorithm, 
-        if (!message.Contains(" "))
-        {
-            //then we will run through each character instead and return the string which has as many characters within it as possible
-            //Without overflowing the textbox height
-            return MaxCharDisplay(message, textGenerator, generationSettings, rectHeight);
-        }
-
-        return MaxVerticalWordDisplay(message, textGenerator, generationSettings, rectHeight);
+        return message.All(char.IsWhiteSpace) ? MaxVerticalWordDisplay(message, textGenerator, generationSettings, rectHeight) : MaxCharDisplay(message, textGenerator, generationSettings, rectHeight);
     }
 
+    private static readonly Regex _regex = new(@"\b(\S+\s*)");
+    
     //punctuation is included in the strings (since ' ' is used as a delimiter).
     private static List<string> MaxVerticalWordDisplay(string message, TextGenerator textGenerator,
         TextGenerationSettings generationSettings, float rectHeight)
@@ -90,22 +89,24 @@ public class TextFit : MonoBehaviour
         string currentString = "";
         string previousString = "";
         var strings = new List<string>(3);
-        var words = message.Split(' ').ToList();
-
+        //var words = _regex.Split(message).Where(s => !string.IsNullOrEmpty(s)).ToList();
+        string[] words = _regex.Matches(message).Select(m => m.Value).ToArray();
         //next we add the words to the strings
 
-        for (var i = 0; i < words.Count; i++)
+        for (var i = 0; i < words.Length; i++)
         {
-            currentString += $" {words[i]}";
+            currentString += words[i];
+            /*currentString += $" {words[i]}";*/
 
             //supposedly this if statement always fails... however this function... well, functioned, fine so maybe i forgot (as usual) to do some code cleanup
             //in any case, i'm not saying this code is efficient, but it does the stuff properly so who cares? not like unity provides a better option (yet?)
             var prefHeight = textGenerator.GetPreferredHeight(currentString, generationSettings);
             if (prefHeight > rectHeight)
             {
-                //removes a random space that would sometimes appear at the start of a message
+                //unknown if this is needed due to now using Regex.Matches instead of string.split
+                /*//removes a random space that would sometimes appear at the start of a message
                 if (Char.IsWhiteSpace(previousString[0]))
-                    previousString = previousString[1..];
+                    previousString = previousString[1..];*/
                 strings.Add(previousString);
                 previousString = "";
                 currentString = previousString = words[i];
@@ -158,7 +159,7 @@ public class TextFit : MonoBehaviour
         
     }*/
     
-    private static bool IsCnJp(char c)
+    /*private static bool IsCnJp(char c)
     {
         //0x2E00-0x312F
         //0x3190-0x4DBF
@@ -178,5 +179,5 @@ public class TextFit : MonoBehaviour
         }
         
         return false;
-    }
+    }*/
 }
