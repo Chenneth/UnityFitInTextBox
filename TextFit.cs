@@ -20,7 +20,6 @@ public class TextFit : MonoBehaviour
     /// <returns></returns>
     public static List<string> MaxVerticalTextDisplay(Text testText, Canvas canvas, string message, bool newlineSeparator = false)
     {
-        
         if (string.IsNullOrEmpty(message))
             throw new ArgumentException("The string was either null or empty.", nameof(message));
         var rect = testText.rectTransform.rect;
@@ -28,9 +27,14 @@ public class TextFit : MonoBehaviour
         var rectHeight = rect.height * canvas.scaleFactor;
 
         var textGenerator = testText.cachedTextGeneratorForLayout;
-
         //if there's whitespace, then it will fill the textbox normally based on words/newlines, otherwise it will try to fill the text box with as many chars as possible
-        return message.All(char.IsWhiteSpace) ? MaxVerticalWordDisplay(message, textGenerator, generationSettings, rectHeight) : MaxCharDisplay(message, textGenerator, generationSettings, rectHeight);
+        if (message.Any(char.IsWhiteSpace))
+            if (newlineSeparator)
+                return MaxVerticalWordDisplayAlt(message, textGenerator, generationSettings, rectHeight);
+            else
+                return MaxVerticalWordDisplay(message, textGenerator, generationSettings, rectHeight);
+        else
+            return MaxCharDisplay(message, textGenerator, generationSettings, rectHeight);
     }
 
     /// <summary>
@@ -42,7 +46,7 @@ public class TextFit : MonoBehaviour
     /// <param name="testText">The Unity Text to be tested.</param>
     /// <param name="message">The message to be inputted into <see cref="testText" /></param>
     /// <returns></returns>
-    public static List<string> MaxVerticalTextDisplay(Text testText, string message)
+    public static List<string> MaxVerticalTextDisplay(Text testText, string message, bool newlineSeparator = false)
     {
         if (string.IsNullOrEmpty(message))
             throw new ArgumentException("The string was either null or empty.", nameof(message));
@@ -53,7 +57,13 @@ public class TextFit : MonoBehaviour
 
         var textGenerator = testText.cachedTextGeneratorForLayout;
 
-        return message.All(char.IsWhiteSpace) ? MaxVerticalWordDisplay(message, textGenerator, generationSettings, rectHeight) : MaxCharDisplay(message, textGenerator, generationSettings, rectHeight);
+        if (message.Any(char.IsWhiteSpace))
+            if (newlineSeparator)
+                return MaxVerticalWordDisplayAlt(message, textGenerator, generationSettings, rectHeight);
+            else
+                return MaxVerticalWordDisplay(message, textGenerator, generationSettings, rectHeight);
+        else
+            return MaxCharDisplay(message, textGenerator, generationSettings, rectHeight);
     }
 
     private static readonly Regex WORD_MATCH = new(@"\b(\S+\s*)");
@@ -105,24 +115,43 @@ public class TextFit : MonoBehaviour
         //var words = _regex.Split(message).Where(s => !string.IsNullOrEmpty(s)).ToList();
         string[] words = WORD_MATCH.Matches(message).Select(m => m.Value).ToArray();
         //next we add the words to the strings
-
         for (var i = 0; i < words.Length; i++)
         {
-            currentString += words[i];
-            float prefHeight = textGenerator.GetPreferredHeight(currentString, generationSettings);
-            if (prefHeight > rectHeight) //if the text cannot fit into the box
+            string curWord = words[i];
+            float prefHeight;
+            if (curWord.TryFindIndices(c => c is '\n' or '\r', out var indices))
             {
-                strings.Add(previousString);
-                currentString = previousString = words[i];
+                int prevIndex = 0;
+                foreach (int index in indices)
+                {
+                    currentString += curWord[prevIndex..index];
+                    prefHeight = textGenerator.GetPreferredHeight(currentString, generationSettings);
+                    if (prefHeight > rectHeight) //if the text cannot fit into the box
+                    {
+                        strings.Add(previousString);
+                        currentString = previousString = curWord[prevIndex..index];
+                    }
+                    strings.Add(currentString);
+                    prevIndex = index+1;//i think it needs +1 to ignore the \n or \r?
+                    currentString = "";
+                }
+
+                currentString = previousString = curWord[prevIndex..];
             }
-            else if (currentString[^1] is '\n' or '\r') //if the text can fit in the box but ends with a newline or return
+            else
             {
-                strings.Add(currentString[..^1]);
-                currentString = previousString = "";
-            }
-            else //otherwise we add stuff to prev string
-            {
-                previousString = currentString;
+                currentString += curWord;
+
+                prefHeight = textGenerator.GetPreferredHeight(currentString, generationSettings);
+                if (prefHeight > rectHeight) //if the text cannot fit into the box
+                {
+                    strings.Add(previousString);
+                    currentString = previousString = curWord;
+                }
+                else //otherwise we add stuff to prev string
+                {
+                    previousString = currentString;
+                }
             }
         }
         strings.Add(previousString);
@@ -156,8 +185,8 @@ public class TextFit : MonoBehaviour
 
         return strings;
     }
-
-
+    
+    
     /*private static List<string> MaxCnJpDisplay(string message, TextGenerator textGenerator, TextGenerationSettings generationSettings, float rectHeight)
     {
         
@@ -185,4 +214,25 @@ public class TextFit : MonoBehaviour
         
         return false;
     }*/
+}
+
+public static class TestClass
+{
+    public static bool TryFindIndices<T>(this IEnumerable<T> items, Func<T, bool> predicate, out IEnumerable<int> indices) 
+    {
+        int i = 0;
+        List<int> indicesList = new List<int>(1);
+        foreach (var item in items) 
+        {
+            if (predicate(item))
+            {
+                indicesList.Add(i);
+            }
+
+            i++;
+        }
+
+        indices = indicesList.AsEnumerable();
+        return indicesList.Count > 0;
+    } //modified from sta ckover flow.c om/questions/14476162/14476244#14476244
 }
