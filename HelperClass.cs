@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 
-public static class TestClass
+public static class HelperClass
 {
+    public static readonly Regex WORD_MATCH = new(@"\b(\S+\s*)");
     public static bool TryFindIndices<T>(this IEnumerable<T> items, Func<T, bool> predicate, out IEnumerable<int> indices) 
     {
         int i = 0;

@@ -66,7 +66,7 @@ public class TextFit : MonoBehaviour
             return MaxCharDisplay(message, textGenerator, generationSettings, rectHeight);
     }
 
-    private static readonly Regex WORD_MATCH = new(@"\b(\S+\s*)");
+    
     
     //punctuation is included in the strings (since ' ' is used as a delimiter).
     private static List<string> MaxVerticalWordDisplay(string message, TextGenerator textGenerator,
@@ -80,7 +80,7 @@ public class TextFit : MonoBehaviour
         string previousString = ""; //prev string exists to prevent the need to backtrack/try to subtract a string (although I suppose I could use words[i].Length and some substring nonsense)
         var strings = new List<string>(3);
         //var words = _regex.Split(message).Where(s => !string.IsNullOrEmpty(s)).ToList();
-        string[] words = WORD_MATCH.Matches(message).Select(m => m.Value).ToArray();
+        string[] words = HelperClass.WORD_MATCH.Matches(message).Select(m => m.Value).ToArray();
         //next we add the words to the strings
 
         for (var i = 0; i < words.Length; i++)
@@ -113,7 +113,7 @@ public class TextFit : MonoBehaviour
         string previousString = ""; //prev string exists to prevent the need to backtrack/try to subtract a string (although I suppose I could use words[i].Length and some substring nonsense)
         var strings = new List<string>(3);
         //var words = _regex.Split(message).Where(s => !string.IsNullOrEmpty(s)).ToList();
-        string[] words = WORD_MATCH.Matches(message).Select(m => m.Value).ToArray();
+        string[] words = HelperClass.WORD_MATCH.Matches(message).Select(m => m.Value).ToArray();
         //next we add the words to the strings
         for (var i = 0; i < words.Length; i++)
         {
