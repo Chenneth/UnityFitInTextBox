@@ -129,9 +129,7 @@ public class TextFit : MonoBehaviour
                     if (prefHeight > rectHeight) //if the text cannot fit into the box
                     {
                         strings.Add(previousString);
-                        Debug.Log(strings[^1]);
                         currentString = previousString = curWord[prevIndex..index];
-                        Debug.Log(currentString);
                     }
                     strings.Add(currentString);
                     prevIndex = index+1;//i think it needs +1 to ignore the \n or \r?
