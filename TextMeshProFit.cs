@@ -5,6 +5,7 @@ using System.Linq;
 using TMPro;
 using UnityEngine;
 
+//if someone has a better idea than creating a second set of functions for gui vs canvas tmp please 
 public class TextMeshProFit : MonoBehaviour
 {
     /// <summary>
@@ -13,62 +14,14 @@ public class TextMeshProFit : MonoBehaviour
     ///     This only works for languages that use spaces to delimit words (this may result in unnatural splicing of East Asian
     ///     words)
     /// </summary>
-    /// <param name="testText">The text box to be tested.</param>
+    /// <param name="testText">The TextMesh Pro to be tested.</param>
     /// <param name="message">The message to be inputted into <see cref="testText" /></param>
     /// <returns>A list consisting of each line delimited by however many words can fit into the given TextMeshPro asset.</returns>
     public static List<string> MaxVerticalTextDisplay(TextMeshPro testText, string message)
     {
-        var rect = testText.rectTransform.rect;
-        var rectHeight = rect.height;
-
-        if (message.All(IsCnJp)) //if all the chars are cn/jp
-        {
-            //then we do diff algorithm (yay)
-            //MaxCnJpDisplay(message, textGenerator, generationSettings, rectHeight);
-        }
-
-        //if the given message does not contain any spaces todo: check for JP/CN chars (since I don't know anything about KR/AR etc.) to delimit it in its own algorithm, 
-        if (!message.Contains(" "))
-        {
-            //then we will run through each character instead and return the string which has as many characters within it as possible
-            //Without overflowing the textbox height
-            return MaxCharDisplay(testText, message, rect);
-        }
-
-        return MaxVerticalWordDisplay(testText, message, rect);
+        return !message.Contains(" ") ? MaxCharDisplay(testText, message, testText.rectTransform.rect) : MaxVerticalWordDisplay(testText, message, testText.rectTransform.rect);
     }
-
-    /// <summary>
-    ///     Returns a list of strings delimited by the maximum amount of words that can fit inside <see cref="testText" />.
-    ///     This stops vertical overflow of text. This does not stop horizontal overflow.
-    ///     This only works for languages that use spaces to delimit words (this may result in unnatural splicing of East Asian
-    ///     words)
-    /// </summary>
-    /// <param name="testText">The text box to be tested.</param>
-    /// <param name="message">The message to be inputted into <see cref="testText" /></param>
-    /// <returns>A list consisting of each line delimited by however many words can fit into the given TextMeshPro asset.</returns>
-    public static List<string> MaxVerticalTextDisplay(TextMeshProUGUI testText, Canvas canvas, string message)
-    {
-        var rect = testText.rectTransform.rect;
-
-        if (message.All(IsCnJp)) //if all the chars are cn/jp
-        {
-            //then we do diff algorithm (yay)
-        }
-
-        //if the given message does not contain any spaces 
-        if (!message.Contains(" "))
-        {
-            //then we will run through each character instead and return the string which has as many characters within it as possible
-            //Without overflowing the textbox height
-            return MaxCharDisplay(testText, message, rect, canvas.scaleFactor);
-        }
-
-        return MaxVerticalWordDisplay(testText, message, rect, canvas.scaleFactor);
-    }
-
-    //punctuation is included in the strings (since ' ' is used as a delimiter).
-    private static List<string> MaxVerticalWordDisplay(TextMeshPro testText, string message, Rect rect)
+   private static List<string> MaxVerticalWordDisplay(TextMeshPro testText, string message, Rect rect)
     {
         string currentString = "";
         string previousString = "";
@@ -80,30 +33,46 @@ public class TextMeshProFit : MonoBehaviour
         {
             throw new UnityException("The width or height of the Text GameObject is too small to fit any text.");
         }
-        var words = message.Split(' ').ToList();
+        var words = HelperClass.WORD_MATCH.Matches(message).Select(m => m.Value).ToArray();
 
         //next we add the words to the strings
 
-        for (var i = 0; i < words.Count; i++)
+        for (var i = 0; i < words.Length; i++)
         {
-            currentString += $" {words[i]}";
-            //supposedly this if statement always fails... however this function... well, functioned, fine so maybe i forgot (as usual) to do some code cleanup
-            //in any case, i'm not saying this code is efficient, but it does the stuff properly so who cares? not like unity provides a better option (yet?)
-            var prefHeight = testText.GetPreferredValues(currentString,rectWidth,rectHeight).y;
-            if (prefHeight > rectHeight)
+            string curWord = words[i];
+            float prefHeight;
+            if (curWord.TryFindIndices(c => c is '\n' or '\r', out var indices))
             {
-                //removes a random space that would sometimes appear at the start of a message
-                if (Char.IsWhiteSpace(
-                        previousString[0])) //i guess we could also do a while loop in case multiple show up buy meh
-                    previousString = previousString[1..];
-                strings.Add(previousString);
-                previousString = "";
-                currentString = previousString = words[i];
+                int prevIndex = 0;
+                foreach (int index in indices)
+                {
+                    currentString += curWord[prevIndex..index];
+                    prefHeight = testText.GetPreferredValues(currentString, rectWidth, rectHeight).y;
+                    if (prefHeight > rectHeight) //if the text cannot fit into the box
+                    {
+                        strings.Add(previousString);
+                        currentString = previousString = curWord[prevIndex..index];
+                    }
+                    strings.Add(currentString);
+                    prevIndex = index+1;//i think it needs +1 to ignore the \n or \r?
+                    currentString = previousString = "";
+                }
+
+                currentString = previousString = curWord[prevIndex..];
             }
-            //this is kinda useless since currentString would be set blank in the if statement...
             else
             {
-                previousString = currentString;
+                currentString += curWord;
+                prefHeight = testText.GetPreferredValues(currentString, rectWidth, rectHeight).y;
+                if (prefHeight > rectHeight)
+                {
+                    strings.Add(previousString);
+                    currentString = previousString = words[i];
+                }
+                else
+                {
+                    previousString = currentString;
+                }
             }
         }
 
@@ -147,14 +116,24 @@ public class TextMeshProFit : MonoBehaviour
 
         return strings;
     }
-
-
-    /*private static List<string> MaxCnJpDisplay(string message, TextGenerator textGenerator, TextGenerationSettings generationSettings, float rectHeight)
-    {
-        
-        
-    }*/
     
+    /// <summary>
+    ///     Returns a list of strings delimited by the maximum amount of words that can fit inside <see cref="testText" />.
+    ///     This stops vertical overflow of text. This does not stop horizontal overflow.
+    ///     This only works for languages that use spaces to delimit words (this may result in unnatural splicing of East Asian
+    ///     words)
+    /// </summary>
+    /// <param name="testText">The TextMesh pro to be tested.</param>
+    /// <param name="canvas">The Canvas <see cref="testText"/> is a child of.</param>
+    /// <param name="message">The message to be inputted into <see cref="testText" /></param>
+    /// <returns>A list consisting of each line delimited by however many words can fit into the given TextMeshPro asset.</returns>
+    public static List<string> MaxVerticalTextDisplay(TextMeshProUGUI testText, Canvas canvas, string message)
+    {
+        return !message.Contains(" ") ? MaxCharDisplay(testText, message, testText.rectTransform.rect, canvas.scaleFactor) : MaxVerticalWordDisplay(testText, message, testText.rectTransform.rect, canvas.scaleFactor);
+    }
+
+    //punctuation is included in the strings (since ' ' is used as a delimiter).
+ 
     //punctuation is included in the strings (since ' ' is used as a delimiter).
     private static List<string> MaxVerticalWordDisplay(TextMeshProUGUI testText, string message, Rect rect,
         float canvasScaleFactor)
@@ -170,35 +149,48 @@ public class TextMeshProFit : MonoBehaviour
         var strings = new List<string>(3);
 
 
-        var words = message.Split(' ').ToList();
+        var words = HelperClass.WORD_MATCH.Matches(message).Select(m => m.Value).ToArray();
 
         //next we add the words to the strings
 
-        for (var i = 0; i < words.Count; i++)
+        for (var i = 0; i < words.Length; i++)
         {
-            currentString += $" {words[i]}";
-
-            //supposedly this if statement always fails... however this function... well, functioned, fine so maybe i forgot (as usual) to do some code cleanup
-            //in any case, i'm not saying this code is efficient, but it does the stuff properly so who cares? not like unity provides a better option (yet?)
-            var prefHeight = testText.GetPreferredValues(currentString, rectWidth, rectHeight).y;
-            if (prefHeight > rectHeight)
+            string curWord = words[i];
+            float prefHeight;
+            if (curWord.TryFindIndices(c => c is '\n' or '\r', out var indices))
             {
-                //removes a random space that would sometimes appear at the start of a message
-                if (Char.IsWhiteSpace(previousString[0]))
-                    previousString = previousString[1..];
-                strings.Add(previousString);
-                previousString = "";
-                currentString = previousString = words[i];
+                int prevIndex = 0;
+                foreach (int index in indices)
+                {
+                    currentString += curWord[prevIndex..index];
+                    prefHeight = testText.GetPreferredValues(currentString, rectWidth, rectHeight).y;
+                    if (prefHeight > rectHeight)
+                    {
+                        strings.Add(previousString);
+                        currentString = previousString = curWord[prevIndex..index];
+                    }
+                    strings.Add(currentString);
+                    prevIndex = index+1;
+                    currentString = previousString = "";
+                }
+                
+                currentString = previousString = curWord[prevIndex..];
             }
-            //this is kinda useless since currentString would be set blank in the if statement...
             else
             {
-                previousString = currentString;
+                currentString += curWord;
+                prefHeight = testText.GetPreferredValues(currentString, rectWidth, rectHeight).y;
+                if (prefHeight > rectHeight)
+                {
+                    strings.Add(previousString);
+                    currentString = previousString = words[i];
+                }
+                else
+                {
+                    previousString = currentString;
+                }
             }
         }
-
-        if (Char.IsWhiteSpace(previousString[0]))
-            previousString = previousString[1..];
         strings.Add(previousString);
         return strings;
     }
@@ -206,6 +198,7 @@ public class TextMeshProFit : MonoBehaviour
     private static List<string> MaxCharDisplay(TextMeshProUGUI testText, string message, Rect rect,
         float canvasScaleFactor)
     {
+        Debug.Log("MaxChar");
         var strings = new List<string>(3);
         var chars = message.ToCharArray();
         var rectHeight = rect.height * canvasScaleFactor;
@@ -225,7 +218,6 @@ public class TextMeshProFit : MonoBehaviour
                 strings.Add(s);
                 s = c.ToString();
             }
-            //this is kinda useless since currentString would be set blank in the if statement...
             else
             {
                 s += c;
@@ -234,14 +226,8 @@ public class TextMeshProFit : MonoBehaviour
 
         return strings;
     }
-
-
-    /*private static List<string> MaxCnJpDisplay(string message, TextGenerator textGenerator, TextGenerationSettings generationSettings, float rectHeight)
-    {
-        
-        
-    }*/
-    private static bool IsCnJp(char c)
+    
+    /*private static bool IsCnJp(char c)
     {
         //0x2E00-0x312F
         //0x3190-0x4DBF
@@ -261,5 +247,5 @@ public class TextMeshProFit : MonoBehaviour
         }
 
         return false;
-    }
+    }*/
 }
